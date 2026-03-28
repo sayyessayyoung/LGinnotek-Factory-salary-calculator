@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세전 월급 계산기</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; max-width: 500px; margin: auto; background-color: #f4f4f9; }
+        .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; color: #555; }
+        input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        
+        button.calc-submit { width: 100%; padding: 12px; background-color: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px; }
+        button.calc-submit:hover { background-color: #1a252f; }
+        
+        .result-box { margin-top: 20px; padding: 15px; background-color: #e8f4f8; border: 1px solid #bce8f1; border-radius: 4px; display: none; }
+        .result-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; color: #333; }
+        .total { font-size: 18px; font-weight: bold; border-top: 2px solid #2c3e50; padding-top: 12px; margin-top: 10px; color: #e74c3c; }
+        .section-title { font-size: 15px; font-weight: bold; margin: 20px 0 10px 0; color: #2980b9; border-bottom: 1px solid #ccc; padding-bottom: 5px;}
+        
+        /* 시수 요약 안내 스타일 */
+        .summary-note { font-size: 12.5px; color: #555; margin-top: 15px; background-color: #fdfdfd; padding: 10px; border-radius: 4px; border: 1px dashed #ccc; line-height: 1.5; }
+        
+        /* 외부 링크 버튼(창) 스타일 */
+        .external-link-btn { display: block; width: 100%; padding: 14px; background-color: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin-top: 20px; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: background-color 0.2s; }
+        .external-link-btn:hover { background-color: #219653; }
+        .link-note { text-align: center; font-size: 12px; color: #7f8c8d; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>세전 월급 계산기</h2>
+
+    <div class="section-title" style="margin-top: 0;">기본 급여 정보</div>
+    <div class="input-group">
+        <label for="basePay">월정액급여 (원)</label>
+        <input type="number" id="basePay" placeholder="명세서 상단 급여기본정보를 확인하세요.">
+    </div>
+    <div class="input-group">
+        <label for="normalWage">통상임금 (원)</label>
+        <input type="number" id="normalWage" placeholder="교대근무자는 교대통상임금 입력하세요.">
+    </div>
+    <div class="input-group">
+        <label for="isShift">교대 유무</label>
+        <select id="isShift">
+            <option value="O">교대 O (교대제수당 150,000원 적용)</option>
+            <option value="X">교대 X</option>
+        </select>
+    </div>
+
+    <div class="section-title">교대 근무 스케줄</div>
+    <div class="input-group">
+        <label for="nightNoOtDays">1. 야간 근무 (잔업 X) 일수</label>
+        <input type="number" id="nightNoOtDays" placeholder="예: 5">
+    </div>
+    <div class="input-group">
+        <label for="nightWithOtDays">2. 야간 근무 (풀 잔업 O) 일수</label>
+        <input type="number" id="nightWithOtDays" placeholder="예: 5">
+    </div>
+    <div class="input-group">
+        <label for="dayWithOtDays">3. 주간 근무 (풀 잔업 O) 일수</label>
+        <input type="number" id="dayWithOtDays" placeholder="예: 3">
+    </div>
+    <div class="input-group">
+        <label for="partialOtTime">4. 기타 부분 잔업 시간 (사내 6진법 표기)</label>
+        <input type="number" id="partialOtTime" step="0.1" placeholder="예: 1.0 (1시간)">
+    </div>
+    <div class="input-group">
+        <label for="holidayDays">5. 특근 일수</label>
+        <input type="number" id="holidayDays" placeholder="예: 2">
+    </div>
+
+    <button class="calc-submit" onclick="calculateSalary()">급여 계산하기</button>
+
+    <div id="result" class="result-box"></div>
+</div>
+
+<script>
+    // 6진법을 분(Minute) 단위로 변환
+    function toMinutes(base6Time) {
+        if (!base6Time || isNaN(base6Time)) return 0;
+        const parts = base6Time.toString().split('.');
+        const hours = parseInt(parts[0], 10) || 0;
+        const minutes = parts[1] ? parseInt(parts[1].substring(0,1), 10) * 10 : 0; 
+        return (hours * 60) + minutes;
+    }
+
+    // 총 분(Minute)을 화면 표기용 '사내 6진법(예: 5.4)'으로 다시 변환
+    function toBase6(totalMinutes) {
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        const base6Decimal = minutes / 10; 
+        return parseFloat(`${hours}.${base6Decimal}`);
+    }
+
+    function calculateSalary() {
+        const basePay = parseFloat(document.getElementById('basePay').value) || 0;
+        const normalWage = parseFloat(document.getElementById('normalWage').value) || 0;
+        const isShift = document.getElementById('isShift').value;
+        
+        const nightNoOtDays = parseFloat(document.getElementById('nightNoOtDays').value) || 0;
+        const nightWithOtDays = parseFloat(document.getElementById('nightWithOtDays').value) || 0;
+        const dayWithOtDays = parseFloat(document.getElementById('dayWithOtDays').value) || 0;
+        const partialOtTime = parseFloat(document.getElementById('partialOtTime').value) || 0;
+        const holidayDays = parseFloat(document.getElementById('holidayDays').value) || 0;
+
+        // 통상시급 연산
+        const hourlyRate = normalWage / 226;
+
+        // 시수를 '분'으로 완벽히 치환하여 합산
+        const totalNightMinutes = (nightNoOtDays * toMinutes(6.3)) + (nightWithOtDays * toMinutes(6.5)); 
+        const totalOtMinutes = (nightWithOtDays * toMinutes(2.5)) + (dayWithOtDays * toMinutes(2.5)) + toMinutes(partialOtTime);
+
+        // 안내용 6진법 시수 도출
+        const displayNightHours = toBase6(totalNightMinutes);
+        const displayOtHours = toBase6(totalOtMinutes);
+
+        // 금액 연산용 10진법 변환
+        const calcNightHours = totalNightMinutes / 60;
+        const calcOtHours = totalOtMinutes / 60;
+
+        // 수당 산출
+        const shiftAllowance = isShift === 'O' ? 150000 : 0;
+        const nightAllowance = hourlyRate * 0.5 * calcNightHours;
+        const otAllowance = hourlyRate * 1.5 * calcOtHours; 
+        const holidayAllowance = hourlyRate * 8 * 1.5 * holidayDays;
+
+        // 세전 총액
+        const grossSalary = basePay + shiftAllowance + nightAllowance + otAllowance + holidayAllowance;
+
+        // 화면 출력
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="section-title">세전 급여 상세 내역</div>
+            <div class="result-item"><span>월정액급여:</span> <span>${Math.floor(basePay).toLocaleString()} 원</span></div>
+            <div class="result-item"><span>교대제수당:</span> <span>${Math.floor(shiftAllowance).toLocaleString()} 원</span></div>
+            <div class="result-item"><span>평일 연장수당:</span> <span>${Math.floor(otAllowance).toLocaleString()} 원</span></div>
+            <div class="result-item"><span>야근 수당:</span> <span>${Math.floor(nightAllowance).toLocaleString()} 원</span></div>
+            <div class="result-item"><span>특근 수당:</span> <span>${Math.floor(holidayAllowance).toLocaleString()} 원</span></div>
+            <div class="result-item total"><span>세전 총 급여액:</span> <span>${Math.floor(grossSalary).toLocaleString()} 원</span></div>
+            
+            <div class="summary-note">
+                <strong>[적용된 스케줄 총 시수]</strong><br>
+                - 총 야간 시수: <strong>${displayNightHours}</strong> 시간 (사내 기준)<br>
+                - 총 잔업 시수: <strong>${displayOtHours}</strong> 시간 (사내 기준)
+            </div>
+
+            <a href="https://salary.taxtip.co.kr/" target="_blank" class="external-link-btn">
+                세후 월급 알아보러 가기
+            </a>
+            <div class="link-note">
+                위 <strong>세전 총 급여액</strong>을 입력하여 실수령액을 확인해 보세요.
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
